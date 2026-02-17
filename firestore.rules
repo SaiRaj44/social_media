@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if user email is in the authorized list
+    function isAuthorized() {
+      return isAuthenticated() &&
+        request.auth.token.email in [
+          'sairaj@iittp.ac.in',
+          'abijith@iittp.ac.in',
+          'chalavadivishnu@iittp.ac.in'
+        ];
+    }
+
+    // Helper: Check if user is In-Charge
+    function isInCharge() {
+      return isAuthenticated() &&
+        request.auth.token.email == 'chalavadivishnu@iittp.ac.in';
+    }
+
+    // Posts collection
+    match /posts/{postId} {
+      // Read: only authorized users
+      allow read: if isAuthorized();
+
+      // Create: only authorized users
+      allow create: if isAuthorized()
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0;
+
+      // Update: authorized users can update, but status changes
+      // to 'Approved' or 'Posted' require In-Charge
+      allow update: if isAuthorized() && (
+        // If changing status to Approved/Posted, must be In-Charge
+        (
+          request.resource.data.status in ['Approved', 'Posted'] &&
+          resource.data.status != request.resource.data.status
+        ) ? isInCharge() : true
+      );
+
+      // Delete: only if status is not Approved or Posted
+      allow delete: if isAuthorized()
+                    && !(resource.data.status in ['Approved', 'Posted']);
+    }
+
+    // Audit logs collection - append-only
+    match /auditLogs/{logId} {
+      // Read: only authorized users
+      allow read: if isAuthorized();
+
+      // Create: only authorized users
+      allow create: if isAuthorized()
+                    && request.resource.data.action is string
+                    && request.resource.data.performedBy is string;
+
+      // Never allow update or delete of audit logs
+      allow update, delete: if false;
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

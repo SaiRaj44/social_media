@@ -1,0 +1,58 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if user email is in the authorized list
+    function isAuthorized() {
+      return isAuthenticated() &&
+        request.auth.token.email in [
+          'sairaj@iittp.ac.in',
+          'abijith@iittp.ac.in',
+          'chalavadivishnu@iittp.ac.in'
+        ];
+    }
+
+    // Helper: Check if file is a valid image
+    function isValidImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // Helper: Check if file size is within limit (5MB)
+    function isWithinSizeLimit() {
+      return request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Social media storage rules
+    match /social-media/{postId}/{allPaths=**} {
+      // Allow read only for authenticated authorized users
+      allow read: if isAuthorized();
+
+      // Allow create (upload) if:
+      // - User is authenticated and authorized
+      // - File is a valid image type
+      // - File is within size limit
+      allow create: if isAuthorized()
+                    && isValidImage()
+                    && isWithinSizeLimit();
+
+      // Allow update (overwrite) only by authorized users
+      allow update: if isAuthorized()
+                    && isValidImage()
+                    && isWithinSizeLimit();
+
+      // Allow delete only by authorized users
+      // Note: Post status check is handled server-side via API
+      allow delete: if isAuthorized();
+    }
+
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
