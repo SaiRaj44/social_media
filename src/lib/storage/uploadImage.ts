@@ -1,10 +1,6 @@
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { storage, db } from '@/lib/firebase';
-import { STORAGE_BASE_PATH } from '@/lib/constants';
-import { generateThumbnail } from './generateThumbnail';
 import imageCompression from 'browser-image-compression';
 import type { MediaItem, UploadProgress } from '@/lib/types';
+import { Timestamp } from 'firebase/firestore';
 
 interface UploadOptions {
     postId: string;
@@ -29,30 +25,6 @@ export async function compressImage(file: File): Promise<File> {
     }
 }
 
-async function uploadFileToStorage(
-    fileBlob: Blob,
-    storagePath: string,
-    onProgress?: (progress: number) => void
-): Promise<string> {
-    const storageRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(storageRef, fileBlob);
-
-    return new Promise((resolve, reject) => {
-        uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                onProgress?.(progress);
-            },
-            (error) => reject(error),
-            async () => {
-                const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(downloadUrl);
-            }
-        );
-    });
-}
-
 export async function uploadImage(
     file: File,
     options: UploadOptions
@@ -68,60 +40,50 @@ export async function uploadImage(
     });
 
     try {
-        // Compress the image
+        // Compress the image client-side
+        onProgress?.({
+            fileName: file.name,
+            progress: 10,
+            status: 'uploading',
+        });
         const compressed = await compressImage(file);
 
-        // Generate thumbnail
-        const thumbnailBlob = await generateThumbnail(file);
-
-        // Create unique filename
-        const timestamp = Date.now();
-        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const basePath = `${STORAGE_BASE_PATH}/${postId}`;
-        const imagePath = `${basePath}/${timestamp}-${safeName}`;
-        const thumbPath = `${basePath}/thumb-${timestamp}-${safeName}`;
-
-        // Upload original (compressed)
-        const fileUrl = await uploadFileToStorage(
-            compressed,
-            imagePath,
-            (progress) => {
-                onProgress?.({
-                    fileName: file.name,
-                    progress: progress * 0.8, // 80% for main upload
-                    status: 'uploading',
-                });
-            }
-        );
-
-        // Upload thumbnail
-        const thumbnailUrl = await uploadFileToStorage(
-            thumbnailBlob,
-            thumbPath,
-            (progress) => {
-                onProgress?.({
-                    fileName: file.name,
-                    progress: 80 + progress * 0.2, // 20% for thumbnail
-                    status: 'uploading',
-                });
-            }
-        );
-
-        // Create audit log
-        await addDoc(collection(db, 'auditLogs'), {
-            action: 'IMAGE_UPLOADED',
-            performedBy: userEmail,
-            postId,
+        onProgress?.({
             fileName: file.name,
-            timestamp: Timestamp.now(),
+            progress: 30,
+            status: 'uploading',
         });
 
-        const mediaItem: MediaItem = {
+        // Upload to local storage via API
+        const formData = new FormData();
+        formData.append('file', compressed, file.name);
+        formData.append('postId', postId);
+        formData.append('thumbnail', 'true');
+
+        const response = await fetch('/api/local-upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Upload failed');
+        }
+
+        onProgress?.({
             fileName: file.name,
-            fileUrl,
-            thumbnailUrl,
-            fileSize: compressed.size,
-            mimeType: file.type,
+            progress: 90,
+            status: 'uploading',
+        });
+
+        const data = await response.json();
+
+        const mediaItem: MediaItem = {
+            fileName: data.fileName,
+            fileUrl: data.fileUrl,
+            thumbnailUrl: data.thumbnailUrl,
+            fileSize: data.fileSize,
+            mimeType: data.mimeType,
             uploadedBy: userEmail,
             uploadedAt: Timestamp.now(),
         };

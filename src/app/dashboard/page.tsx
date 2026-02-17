@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, deleteDoc, doc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth/AuthContext';
 import StorageDashboard from '@/components/media/StorageDashboard';
@@ -12,7 +12,9 @@ import {
     Image as ImageIcon,
     Calendar,
     FileText,
+    Trash2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Post } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -40,6 +42,27 @@ export default function DashboardPage() {
 
         fetchPosts();
     }, []);
+
+    const handleDeletePost = async (e: React.MouseEvent, postId: string, postTitle: string) => {
+        e.stopPropagation(); // Prevent navigating to edit page
+        if (!confirm(`Delete "${postTitle}"? This cannot be undone.`)) return;
+        if (!user?.email) return;
+
+        try {
+            await deleteDoc(doc(db, 'posts', postId));
+            await addDoc(collection(db, 'auditLogs'), {
+                action: 'POST_DELETED',
+                performedBy: user.email,
+                postId,
+                timestamp: Timestamp.now(),
+            });
+            setPosts((prev) => prev.filter((p) => p.id !== postId));
+            toast.success('Post deleted');
+        } catch (error) {
+            console.error('Error deleting post:', error);
+            toast.error('Failed to delete post');
+        }
+    };
 
     const stats = {
         totalFiles: posts.reduce((sum, p) => sum + (p.media?.length || 0), 0),
@@ -114,7 +137,30 @@ export default function DashboardPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.05 }}
                                 onClick={() => router.push(`/dashboard/posts/${post.id}`)}
+                                style={{ position: 'relative' }}
                             >
+                                {/* Delete button for non-locked posts */}
+                                {post.status !== 'Approved' && post.status !== 'Posted' && (
+                                    <motion.button
+                                        className="icon-btn"
+                                        onClick={(e) => handleDeletePost(e, post.id!, post.title)}
+                                        title="Delete post"
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '0.5rem',
+                                            right: '0.5rem',
+                                            zIndex: 2,
+                                            background: 'rgba(239, 68, 68, 0.15)',
+                                            color: 'var(--danger, #ef4444)',
+                                            borderRadius: '0.5rem',
+                                            padding: '0.375rem',
+                                        }}
+                                    >
+                                        <Trash2 size={16} />
+                                    </motion.button>
+                                )}
                                 <div className="post-card-media">
                                     {post.media?.[0]?.thumbnailUrl ? (
                                         <img
@@ -156,3 +202,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+

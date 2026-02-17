@@ -12,8 +12,7 @@ import {
     collection,
     addDoc,
 } from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth/AuthContext';
 import UploadZone from '@/components/media/UploadZone';
 import ImagePreview from '@/components/media/ImagePreview';

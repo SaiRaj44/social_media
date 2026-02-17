@@ -53,7 +53,7 @@ export default function StorageDashboard({ stats }: StorageDashboardProps) {
 
     return (
         <div className="storage-dashboard">
-            <h3 className="section-title">Storage Overview</h3>
+            <h3 className="section-title">Local Storage Overview</h3>
             <div className="stats-grid">
                 {cards.map((card, idx) => (
                     <motion.div

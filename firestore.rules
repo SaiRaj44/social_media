@@ -13,14 +13,16 @@ service cloud.firestore {
         request.auth.token.email in [
           'sairaj@iittp.ac.in',
           'abijith@iittp.ac.in',
-          'chalavadivishnu@iittp.ac.in'
+          // 'chalavadivishnu@iittp.ac.in' // TODO: Restore later
+          'at250015@iittp.ac.in' // Temporary for testing
         ];
     }
 
     // Helper: Check if user is In-Charge
     function isInCharge() {
       return isAuthenticated() &&
-        request.auth.token.email == 'chalavadivishnu@iittp.ac.in';
+        // request.auth.token.email == 'chalavadivishnu@iittp.ac.in' // TODO: Restore later
+        request.auth.token.email == 'at250015@iittp.ac.in'; // Temporary for testing
     }
 
     // Posts collection

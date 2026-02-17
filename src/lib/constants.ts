@@ -2,7 +2,8 @@
 export const AUTHORIZED_EMAILS = [
     'sairaj@iittp.ac.in',
     'abijith@iittp.ac.in',
-    'chalavadivishnu@iittp.ac.in',
+    // 'chalavadivishnu@iittp.ac.in', // TODO: Restore as in-charge later
+    'at250015@iittp.ac.in', // Temporary for testing
 ] as const;
 
 export const CONTENT_MANAGERS = [
@@ -11,7 +12,8 @@ export const CONTENT_MANAGERS = [
 ] as const;
 
 export const IN_CHARGE = [
-    'chalavadivishnu@iittp.ac.in',
+    // 'chalavadivishnu@iittp.ac.in', // TODO: Restore later
+    'at250015@iittp.ac.in', // Temporary for testing
 ] as const;
 
 // File upload constraints
